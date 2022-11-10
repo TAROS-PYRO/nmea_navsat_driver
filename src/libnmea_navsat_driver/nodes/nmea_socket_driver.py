@@ -30,6 +30,9 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+
+# Modified to not act as a server but a client
+
 import socket
 import sys
 
@@ -46,7 +49,8 @@ def main(args=None):
         local_ip = driver.declare_parameter('ip', '0.0.0.0').value
         local_port = driver.declare_parameter('port', 10110).value
         buffer_size = driver.declare_parameter('buffer_size', 4096).value
-        timeout = driver.declare_parameter('timeout_sec', 2).value
+        timeout = driver.declare_parameter('timeout_sec', 2).value        
+
     except KeyError as e:
         driver.get_logger().err("Parameter %s not found" % e)
         sys.exit(1)
@@ -61,10 +65,13 @@ def main(args=None):
     while rclpy.ok():
         try:
             # Create a socket
-            socket_ = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            #socket_ = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            socket_ = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             # Bind the socket to the port
-            socket_.bind((local_ip, local_port))
+            #socket_.bind((local_ip, local_port))
+            socket_.connect((local_ip, local_port))
+
 
             # Set timeout
             socket_.settimeout(timeout)
@@ -81,9 +88,10 @@ def main(args=None):
                 data_list = data.decode("ascii").strip().split("\n")
 
                 for data in data_list:
-
+                    driver.get_logger().info("Received data: {}".format(data))
+                                        
                     try:
-                        driver.add_sentence(data, frame_id)
+                        driver.add_sentence(data, frame_id)                        
                     except ValueError as e:
                         driver.get_logger().warn(
                             "Value error, likely due to missing fields in the NMEA message. "

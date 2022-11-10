@@ -37,7 +37,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix, NavSatStatus, TimeReference
 from geometry_msgs.msg import TwistStamped, QuaternionStamped
-from tf_transformations import quaternion_from_euler
+#from tf_transformations import quaternion_from_euler
 from libnmea_navsat_driver.checksum_utils import check_nmea_checksum
 from libnmea_navsat_driver import parser
 
@@ -124,10 +124,9 @@ class Ros2NMEADriver(Node):
             self.get_logger().warn("Received a sentence with an invalid checksum. " +
                                    "Sentence was: %s" % nmea_string)
             return False
-
-        parsed_sentence = parser.parse_nmea_sentence(nmea_string)
+        parsed_sentence = parser.parse_nmea_sentence(nmea_string)           
         if not parsed_sentence:
-            self.get_logger().debug("Failed to parse NMEA sentence. Sentence was: %s" % nmea_string)
+            self.get_logger().info("Failed to parse NMEA sentence. Sentence was: %s" % nmea_string)
             return False
 
         if timestamp:
@@ -212,8 +211,8 @@ class Ros2NMEADriver(Node):
         elif 'RMC' in parsed_sentence:
             data = parsed_sentence['RMC']
 
-            # Only publish a fix from RMC if the use_RMC flag is set.
-            if self.use_RMC:
+            # Only publish a fix from RMC if the use_RMC flag is set.            
+            if self.use_RMC:                
                 if data['fix_valid']:
                     current_fix.status.status = NavSatStatus.STATUS_FIX
                 else:
@@ -236,6 +235,7 @@ class Ros2NMEADriver(Node):
                     NavSatFix.COVARIANCE_TYPE_UNKNOWN
 
                 self.fix_pub.publish(current_fix)
+                
 
                 if not math.isnan(data['utc_time']):
                     current_time_ref.time_ref = rclpy.time.Time(seconds=data['utc_time']).to_msg()
@@ -249,6 +249,7 @@ class Ros2NMEADriver(Node):
                 current_vel.twist.linear.x = data['speed'] * math.sin(data['true_course'])
                 current_vel.twist.linear.y = data['speed'] * math.cos(data['true_course'])
                 self.vel_pub.publish(current_vel)
+                
         elif 'GST' in parsed_sentence:
             data = parsed_sentence['GST']
 
@@ -263,7 +264,7 @@ class Ros2NMEADriver(Node):
                 current_heading = QuaternionStamped()
                 current_heading.header.stamp = current_time
                 current_heading.header.frame_id = frame_id
-                q = quaternion_from_euler(0, 0, math.radians(data['heading']))
+                q = self.quaternion_from_euler(0, 0, math.radians(data['heading']))
                 current_heading.quaternion.x = q[0]
                 current_heading.quaternion.y = q[1]
                 current_heading.quaternion.z = q[2]
@@ -279,3 +280,24 @@ class Ros2NMEADriver(Node):
         if len(prefix):
             return '%s/%s' % (prefix, frame_id)
         return frame_id
+    
+    def quaternion_from_euler(self, roll, pitch, yaw):
+        """
+        Converts euler roll, pitch, yaw to quaternion (w in last place)
+        quat = [x, y, z, w]
+        Bellow should be replaced when porting for ROS 2 Python tf_conversions is done.
+        """
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        q = [0] * 4
+        q[0] = cy * cp * cr + sy * sp * sr
+        q[1] = cy * cp * sr - sy * sp * cr
+        q[2] = sy * cp * sr + cy * sp * cr
+        q[3] = sy * cp * cr - cy * sp * sr
+
+        return q
